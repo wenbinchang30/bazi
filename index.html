@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>八字命理線上報表系統</title>
+    <title>八字命理線上報表系統 - 進階版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM -->
@@ -30,7 +30,7 @@
             .no-print { display: none; }
             body { background: white; }
             .print-break { page-break-before: always; }
-            .card { border: 1px solid #ddd; box-shadow: none; }
+            .card { border: 1px solid #ddd; box-shadow: none; break-inside: avoid; }
         }
     </style>
 </head>
@@ -40,386 +40,220 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- 輔助函式：簡轉繁 ---
+        // --- 輔助函式 ---
         const toTraditional = (str) => {
             if (!str) return "";
             return String(str)
-                .replace(/财/g, '財')
-                .replace(/伤/g, '傷')
-                .replace(/杀/g, '殺')
-                .replace(/枭/g, '梟')
-                .replace(/见/g, '見')
-                .replace(/贝/g, '貝')
-                .replace(/马/g, '馬')
-                .replace(/龙/g, '龍')
-                .replace(/鸡/g, '雞')
-                .replace(/猪/g, '豬')
-                .replace(/门/g, '門')
-                .replace(/车/g, '車');
+                .replace(/财/g, '財').replace(/伤/g, '傷').replace(/杀/g, '殺').replace(/枭/g, '梟')
+                .replace(/见/g, '見').replace(/贝/g, '貝').replace(/马/g, '馬').replace(/龙/g, '龍')
+                .replace(/鸡/g, '雞').replace(/猪/g, '豬').replace(/门/g, '門').replace(/车/g, '車');
         };
 
-        // --- 常量與映射資料 ---
-        
+        // --- 資料常數 ---
         const COLORS = {
-            '金': { text: 'text-yellow-600', bg: 'bg-yellow-100', hex: '#d97706', suggest: '白色、金色、銀色' },
+            '金': { text: 'text-yellow-600', bg: 'bg-yellow-100', hex: '#d97706', suggest: '白色、金色' },
             '木': { text: 'text-green-600', bg: 'bg-green-100', hex: '#16a34a', suggest: '綠色、青色' },
             '水': { text: 'text-blue-600', bg: 'bg-blue-100', hex: '#2563eb', suggest: '黑色、藍色' },
-            '火': { text: 'text-red-600', bg: 'bg-red-100', hex: '#dc2626', suggest: '紅色、紫色、粉色' },
-            '土': { text: 'text-amber-700', bg: 'bg-amber-100', hex: '#b45309', suggest: '黃色、咖啡色、米色' }
+            '火': { text: 'text-red-600', bg: 'bg-red-100', hex: '#dc2626', suggest: '紅色、紫色' },
+            '土': { text: 'text-amber-700', bg: 'bg-amber-100', hex: '#b45309', suggest: '黃色、棕色' }
         };
 
         const DIRECTION_SUGGESTIONS = {
-            '金': '西方、西北方',
-            '木': '東方、東南方',
-            '水': '北方',
-            '火': '南方',
-            '土': '中央、本地、西南、東北'
+            '金': '西方、西北方', '木': '東方、東南方', '水': '北方', '火': '南方', '土': '中央、本地'
         };
 
         const CAREER_SUGGESTIONS = {
-            '金': '金融、五金、機械、汽車、珠寶、法官、軍警、外科醫生',
-            '木': '教育、出版、家具、園藝、服裝、醫療、宗教、公務員',
-            '水': '貿易、航海、物流、旅遊、媒體、記者、自由業、服務業',
-            '火': '科技、能源、餐飲、演藝、美容、照明、心理諮商',
-            '土': '房地產、建築、農業、畜牧、仲介、顧問、秘書、倉儲'
+            '金': '金融、機械、汽車、軍警、外科', '木': '教育、出版、園藝、醫療、公務',
+            '水': '貿易、物流、媒體、自由業', '火': '科技、餐飲、演藝、美容', '土': '地產、建築、農業、顧問'
         };
 
-        const PERSONALITY_TRAITS = {
-            '比肩': '自尊心強，意志堅定，積極進取，但易固執己見，獨斷獨行。',
-            '劫財': '個性外向，口才佳，善於社交，但易衝動，情緒化，揮霍。',
-            '食神': '溫和儒雅，重視精神生活，有藝術才華，但有時過於理想化。',
-            '傷官': '聰明才智，才華洋溢，領悟力強，但易恃才傲物，叛逆心重。',
-            '正財': '勤勞節儉，現實務實，重視信用，但有時過於吝嗇，缺乏魄力。',
-            '偏財': '慷慨豪爽，圓滑機智，善於理財，但易投機取巧，重利輕義。',
-            '正官': '品行端正，光明磊落，重視名譽，但有時過於保守，墨守成規。',
-            '七殺': '豪俠仗義，進取心強，有領導力，但易偏激極端，霸道強勢。',
-            '正印': '仁慈端莊，重視傳統，聰明智慧，但有時依賴心重，缺乏獨立。',
-            '偏印': '精明幹練，觀察力強，多才多藝，但易孤僻冷漠，多疑善變。'
-        };
+        const WEALTH_MAP = { '木': '土', '火': '金', '土': '水', '金': '木', '水': '火' };
 
-        const WEALTH_MAP = {
-            '木': '土',
-            '火': '金',
-            '土': '水',
-            '金': '木',
-            '水': '火'
-        };
-
-        // --- 靜態天干屬性資料 (用於手動計算十神) ---
         const GAN_INFO = {
-            '甲': { wx: '木', yy: 1 }, // 1為陽
-            '乙': { wx: '木', yy: 0 }, // 0為陰
-            '丙': { wx: '火', yy: 1 },
-            '丁': { wx: '火', yy: 0 },
-            '戊': { wx: '土', yy: 1 },
-            '己': { wx: '土', yy: 0 },
-            '庚': { wx: '金', yy: 1 },
-            '辛': { wx: '金', yy: 0 },
-            '壬': { wx: '水', yy: 1 },
-            '癸': { wx: '水', yy: 0 }
+            '甲': { wx: '木', yy: 1 }, '乙': { wx: '木', yy: 0 },
+            '丙': { wx: '火', yy: 1 }, '丁': { wx: '火', yy: 0 },
+            '戊': { wx: '土', yy: 1 }, '己': { wx: '土', yy: 0 },
+            '庚': { wx: '金', yy: 1 }, '辛': { wx: '金', yy: 0 },
+            '壬': { wx: '水', yy: 1 }, '癸': { wx: '水', yy: 0 }
         };
 
-        // 五行生剋關係
         const WUXING_RELATION = {
-            '木': { sheng: '火', ke: '土' },
-            '火': { sheng: '土', ke: '金' },
-            '土': { sheng: '金', ke: '水' },
-            '金': { sheng: '水', ke: '木' },
+            '木': { sheng: '火', ke: '土' }, '火': { sheng: '土', ke: '金' },
+            '土': { sheng: '金', ke: '水' }, '金': { sheng: '水', ke: '木' },
             '水': { sheng: '木', ke: '火' }
         };
 
-        // --- 手動計算十神 (核心修復函式) ---
+        // --- 核心運算函式 ---
         const calculateShiShenManual = (dayMasterStr, targetStr) => {
             const dm = GAN_INFO[toTraditional(dayMasterStr)];
             const tg = GAN_INFO[toTraditional(targetStr)];
-            
             if (!dm || !tg) return null;
 
             const isSameYinYang = dm.yy === tg.yy;
             const dmWx = dm.wx;
             const tgWx = tg.wx;
 
-            if (dmWx === tgWx) {
-                return isSameYinYang ? '比肩' : '劫財';
-            }
-            // 我生者 (食傷)
-            if (WUXING_RELATION[dmWx].sheng === tgWx) {
-                return isSameYinYang ? '食神' : '傷官';
-            }
-            // 我剋者 (財)
-            if (WUXING_RELATION[dmWx].ke === tgWx) {
-                return isSameYinYang ? '偏財' : '正財';
-            }
-            // 剋我者 (官殺)
-            if (WUXING_RELATION[tgWx].ke === dmWx) {
-                return isSameYinYang ? '七殺' : '正官';
-            }
-            // 生我者 (印)
-            if (WUXING_RELATION[tgWx].sheng === dmWx) {
-                return isSameYinYang ? '偏印' : '正印';
-            }
+            if (dmWx === tgWx) return isSameYinYang ? '比肩' : '劫財';
+            if (WUXING_RELATION[dmWx].sheng === tgWx) return isSameYinYang ? '食神' : '傷官';
+            if (WUXING_RELATION[dmWx].ke === tgWx) return isSameYinYang ? '偏財' : '正財';
+            if (WUXING_RELATION[tgWx].ke === dmWx) return isSameYinYang ? '七殺' : '正官';
+            if (WUXING_RELATION[tgWx].sheng === dmWx) return isSameYinYang ? '偏印' : '正印';
             return null;
         };
 
-        // --- 安全存取函式 ---
         const safeGetWuXing = (obj) => {
-            if (!obj) return '土';
-            if (typeof obj.getWuXing === 'function') return toTraditional(obj.getWuXing());
+            if (typeof obj?.getWuXing === 'function') return toTraditional(obj.getWuXing());
             if (typeof obj === 'string') {
-                const map = {'甲':'木', '乙':'木', '丙':'火', '丁':'火', '戊':'土', '己':'土', '庚':'金', '辛':'金', '壬':'水', '癸':'水'};
+                const map = {'甲':'木','乙':'木','丙':'火','丁':'火','戊':'土','己':'土','庚':'金','辛':'金','壬':'水','癸':'水'};
                 return map[toTraditional(obj)] || '土';
             }
             return '土';
         };
 
         const safeGetName = (obj) => {
-            if (!obj) return '';
-            if (typeof obj.getName === 'function') return toTraditional(obj.getName());
-            return toTraditional(String(obj));
+            if (typeof obj?.getName === 'function') return toTraditional(obj.getName());
+            return toTraditional(String(obj || ''));
         };
 
         const safeGetHideGan = (zhi) => {
-            if (!zhi) return [];
-            if (typeof zhi.getHideGan === 'function') return zhi.getHideGan();
-            if (typeof zhi.getHiddenGan === 'function') return zhi.getHiddenGan();
+            if (typeof zhi?.getHideGan === 'function') return zhi.getHideGan();
+            if (typeof zhi?.getHiddenGan === 'function') return zhi.getHiddenGan();
             return [];
         }
 
-        // --- 核心組件 ---
+        // --- React 組件 ---
 
         function App() {
             const [formData, setFormData] = useState({
-                year: 1990,
-                month: 6,
-                day: 15,
-                hour: 12,
-                minute: 30,
-                gender: 1,
-                longitude: 120.0,
-                useTrueSolar: true
+                year: 1990, month: 6, day: 15, hour: 12, minute: 30,
+                gender: 1, longitude: 120.0, useTrueSolar: true
             });
             const [result, setResult] = useState(null);
             const [errorMsg, setErrorMsg] = useState('');
             const [isLibraryReady, setIsLibraryReady] = useState(false);
 
             useEffect(() => {
-                if (window.Solar && window.Lunar) {
-                    setIsLibraryReady(true);
-                } else {
-                    const timer = setInterval(() => {
-                        if (window.Solar && window.Lunar) {
-                            setIsLibraryReady(true);
-                            clearInterval(timer);
-                        }
+                if (window.Solar && window.Lunar) setIsLibraryReady(true);
+                else {
+                    const t = setInterval(() => {
+                        if (window.Solar && window.Lunar) { setIsLibraryReady(true); clearInterval(t); }
                     }, 500);
-                    return () => clearInterval(timer);
+                    return () => clearInterval(t);
                 }
             }, []);
 
             const calculateBazi = () => {
-                setErrorMsg('');
-                setResult(null);
-
+                setErrorMsg(''); setResult(null);
                 try {
-                    if (!window.Solar || !window.Lunar) {
-                        throw new Error("八字運算庫 (lunar.js) 尚未載入完成，請檢查網路連線或重新整理頁面。");
+                    if (!window.Solar) throw new Error("核心庫未載入");
+                    
+                    let { year, month, day, hour, minute, longitude, useTrueSolar, gender } = formData;
+                    year = parseInt(year); month = parseInt(month); day = parseInt(day);
+                    hour = parseInt(hour); minute = parseInt(minute);
+
+                    if (useTrueSolar) {
+                        const offset = (parseFloat(longitude) - 120) * 4;
+                        const d = new Date(year, month - 1, day, hour, minute);
+                        d.setMinutes(d.getMinutes() + offset);
+                        year = d.getFullYear(); month = d.getMonth() + 1; day = d.getDate();
+                        hour = d.getHours(); minute = d.getMinutes();
                     }
 
-                    const Solar = window.Solar;
-                    const Lunar = window.Lunar;
-
-                    let solarYear = parseInt(formData.year);
-                    let solarMonth = parseInt(formData.month);
-                    let solarDay = parseInt(formData.day);
-                    let solarHour = parseInt(formData.hour);
-                    let solarMinute = parseInt(formData.minute);
-
-                    if (formData.useTrueSolar) {
-                        const offsetMinutes = (parseFloat(formData.longitude) - 120.0) * 4;
-                        const date = new Date(solarYear, solarMonth - 1, solarDay, solarHour, solarMinute);
-                        date.setMinutes(date.getMinutes() + offsetMinutes);
-
-                        solarYear = date.getFullYear();
-                        solarMonth = date.getMonth() + 1;
-                        solarDay = date.getDate();
-                        solarHour = date.getHours();
-                        solarMinute = date.getMinutes();
-                    }
-
-                    const solar = Solar.fromYmdHms(solarYear, solarMonth, solarDay, solarHour, solarMinute, 0);
+                    const solar = Solar.fromYmdHms(year, month, day, hour, minute, 0);
                     const lunar = Lunar.fromSolar(solar);
                     const eightChar = lunar.getEightChar();
-                    const yun = eightChar.getYun(formData.gender); 
-                    const wuxingScores = {'金': 0, '木': 0, '水': 0, '火': 0, '土': 0};
-                    
-                    const countWuxing = (ganZhi, weight) => {
-                        const wx = safeGetWuXing(ganZhi);
-                        if (wuxingScores[wx] !== undefined) {
-                            wuxingScores[wx] += weight;
-                        }
-                    };
+                    const yun = eightChar.getYun(gender);
+                    const wuxingScores = { '金': 0, '木': 0, '水': 0, '火': 0, '土': 0 };
 
+                    // 五行計分
+                    const countWuxing = (obj, w) => { wuxingScores[safeGetWuXing(obj)] += w; };
                     countWuxing(eightChar.getYearGan(), 10);
                     countWuxing(eightChar.getMonthGan(), 10);
                     countWuxing(eightChar.getDayGan(), 10);
                     countWuxing(eightChar.getTimeGan(), 10);
 
-                    [eightChar.getYearZhi(), eightChar.getMonthZhi(), eightChar.getDayZhi(), eightChar.getTimeZhi()].forEach(zhi => {
-                        const hiddens = safeGetHideGan(zhi); 
-                        hiddens.forEach(gan => {
-                            let score = 0;
-                            if (hiddens.length === 1) score = 10;
-                            else if (hiddens.length === 2) score = 5;
-                            else score = 3.3;
-                            
-                            const wx = safeGetWuXing(gan);
-                            if (wuxingScores[wx] !== undefined) wuxingScores[wx] += score;
-                        });
+                    [eightChar.getYearZhi(), eightChar.getMonthZhi(), eightChar.getDayZhi(), eightChar.getTimeZhi()].forEach(z => {
+                        safeGetHideGan(z).forEach(g => countWuxing(g, 5)); // 簡化藏干權重
                     });
 
                     const dayMaster = eightChar.getDayGan();
                     const dmWuXing = safeGetWuXing(dayMaster);
                     
-                    const shengMeMap = {'木': '水', '火': '木', '土': '火', '金': '土', '水': '金'};
-                    const keMeMap = {'木': '金', '火': '水', '土': '木', '金': '火', '水': '土'};
-                    const meShengMap = {'木': '火', '火': '土', '土': '金', '金': '水', '水': '木'};
-                    const meKeMap = {'木': '土', '火': '金', '土': '水', '金': '木', '水': '火'};
+                    const sheng = WUXING_RELATION[dmWuXing].sheng; // 我生
+                    const ke = WUXING_RELATION[dmWuXing].ke; // 我剋
+                    const beSheng = Object.keys(WUXING_RELATION).find(k => WUXING_RELATION[k].sheng === dmWuXing); // 生我
+                    const beKe = Object.keys(WUXING_RELATION).find(k => WUXING_RELATION[k].ke === dmWuXing); // 剋我
 
-                    const same = wuxingScores[dmWuXing];
-                    const resource = wuxingScores[shengMeMap[dmWuXing]];
-                    
-                    const selfStrength = same + resource;
-                    const opposeStrength = wuxingScores[meShengMap[dmWuXing]] + wuxingScores[meKeMap[dmWuXing]] + wuxingScores[keMeMap[dmWuXing]];
+                    const sameScore = wuxingScores[dmWuXing];
+                    const resourceScore = wuxingScores[beSheng];
+                    const selfStrength = sameScore + resourceScore;
+                    const opposeStrength = wuxingScores[sheng] + wuxingScores[ke] + wuxingScores[beKe];
                     
                     const isStrong = selfStrength >= opposeStrength;
                     
-                    let usefulGods = [];
-                    let avoidGods = [];
-
+                    // 喜用神判定 (簡易邏輯)
+                    let usefulGods = [], avoidGods = [];
                     if (isStrong) {
-                        usefulGods.push(meKeMap[dmWuXing]);
-                        usefulGods.push(keMeMap[dmWuXing]);
-                        usefulGods.push(meShengMap[dmWuXing]);
-                        avoidGods.push(dmWuXing);
-                        avoidGods.push(shengMeMap[dmWuXing]);
+                        usefulGods = [ke, beKe, sheng]; // 喜財、官、食傷
+                        avoidGods = [dmWuXing, beSheng]; // 忌比劫、印
                     } else {
-                        usefulGods.push(shengMeMap[dmWuXing]);
-                        usefulGods.push(dmWuXing);
-                        avoidGods.push(meKeMap[dmWuXing]);
-                        avoidGods.push(keMeMap[dmWuXing]);
-                        avoidGods.push(meShengMap[dmWuXing]);
+                        usefulGods = [beSheng, dmWuXing]; // 喜印、比劫
+                        avoidGods = [ke, beKe, sheng]; // 忌財、官、食傷
                     }
 
-                    setResult({
-                        solar,
-                        lunar,
-                        eightChar,
-                        yun,
-                        wuxingScores,
-                        dayMaster,
-                        isStrong,
-                        usefulGods,
-                        avoidGods,
-                        dmWuXing
-                    });
-
+                    setResult({ solar, lunar, eightChar, yun, wuxingScores, dayMaster, isStrong, usefulGods, avoidGods, dmWuXing });
                 } catch (e) {
-                    console.error("排盤錯誤:", e);
-                    setErrorMsg(`發生錯誤: ${e.message}。請確認輸入資料是否正確。`);
+                    console.error(e);
+                    setErrorMsg("計算錯誤，請檢查輸入日期。");
                 }
             };
 
             return (
-                <div className="min-h-screen pb-10">
+                <div className="min-h-screen pb-10 bg-slate-50">
                     <header className="bg-slate-900 text-amber-50 py-6 px-4 shadow-md no-print">
                         <div className="max-w-5xl mx-auto flex justify-between items-center">
                             <div>
-                                <h1 className="text-2xl font-bold serif tracking-wider">八字命理線上報表系統</h1>
-                                <p className="text-sm text-slate-400 mt-1">子平八字 | 趨吉避凶 | 運勢分析</p>
+                                <h1 className="text-2xl font-bold serif tracking-wider">八字命理線上報表</h1>
+                                <p className="text-sm text-slate-400 mt-1">進階命格交互分析 | 大運流年量化評分</p>
                             </div>
-                            <button className="text-sm bg-amber-700 hover:bg-amber-600 px-4 py-2 rounded text-white" onClick={() => window.print()}>
-                                下載/列印報告
-                            </button>
+                            <button className="text-sm bg-amber-700 hover:bg-amber-600 px-4 py-2 rounded text-white" onClick={() => window.print()}>列印報告</button>
                         </div>
                     </header>
 
                     <main className="max-w-5xl mx-auto p-4 space-y-8">
+                        {/* 輸入區 */}
                         <section className="card bg-white p-6 rounded-lg shadow-sm border border-slate-200 no-print">
-                            <h2 className="text-lg font-bold border-b pb-2 mb-4 text-slate-700">1. 輸入出生資料</h2>
-                            {!isLibraryReady && (
-                                <div className="mb-4 p-3 bg-yellow-50 text-yellow-700 text-sm rounded">
-                                    正在載入命理運算庫，請稍候...
-                                </div>
-                            )}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <label className="block">
-                                    <span className="text-gray-700 text-sm">西元出生年</span>
-                                    <input type="number" value={formData.year} onChange={(e) => setFormData({...formData, year: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2" />
-                                </label>
-                                <label className="block">
-                                    <span className="text-gray-700 text-sm">月</span>
-                                    <select value={formData.month} onChange={(e) => setFormData({...formData, month: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
-                                        {[...Array(12).keys()].map(i => <option key={i+1} value={i+1}>{i+1}月</option>)}
-                                    </select>
-                                </label>
-                                <label className="block">
-                                    <span className="text-gray-700 text-sm">日</span>
-                                    <select value={formData.day} onChange={(e) => setFormData({...formData, day: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
-                                        {[...Array(31).keys()].map(i => <option key={i+1} value={i+1}>{i+1}日</option>)}
-                                    </select>
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <label className="block">
-                                        <span className="text-gray-700 text-sm">時</span>
-                                        <select value={formData.hour} onChange={(e) => setFormData({...formData, hour: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
-                                            {[...Array(24).keys()].map(i => <option key={i} value={i}>{i}時</option>)}
-                                        </select>
-                                    </label>
-                                    <label className="block">
-                                        <span className="text-gray-700 text-sm">分</span>
-                                        <input type="number" value={formData.minute} onChange={(e) => setFormData({...formData, minute: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2" />
-                                    </label>
-                                </div>
-                                <label className="block">
-                                    <span className="text-gray-700 text-sm">性別</span>
-                                    <select value={formData.gender} onChange={(e) => setFormData({...formData, gender: parseInt(e.target.value)})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
-                                        <option value={1}>男</option>
-                                        <option value={0}>女</option>
-                                    </select>
-                                </label>
-                                <label className="block md:col-span-2">
-                                    <span className="text-gray-700 text-sm">出生地經度</span>
-                                    <input type="number" step="0.1" value={formData.longitude} onChange={(e) => setFormData({...formData, longitude: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2" placeholder="預設 120.0" />
+                            <h2 className="text-lg font-bold border-b pb-2 mb-4 text-slate-700">1. 輸入資料</h2>
+                            {!isLibraryReady && <div className="text-yellow-600 mb-2">載入運算庫中...</div>}
+                            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
+                                <input type="number" className="border p-2 rounded" value={formData.year} onChange={e=>setFormData({...formData, year:e.target.value})} placeholder="年" />
+                                <select className="border p-2 rounded" value={formData.month} onChange={e=>setFormData({...formData, month:e.target.value})}>{[...Array(12).keys()].map(i=><option key={i} value={i+1}>{i+1}月</option>)}</select>
+                                <select className="border p-2 rounded" value={formData.day} onChange={e=>setFormData({...formData, day:e.target.value})}>{[...Array(31).keys()].map(i=><option key={i} value={i+1}>{i+1}日</option>)}</select>
+                                <select className="border p-2 rounded" value={formData.hour} onChange={e=>setFormData({...formData, hour:e.target.value})}>{[...Array(24).keys()].map(i=><option key={i} value={i}>{i}時</option>)}</select>
+                                <input type="number" className="border p-2 rounded" value={formData.minute} onChange={e=>setFormData({...formData, minute:e.target.value})} placeholder="分" />
+                                <select className="border p-2 rounded" value={formData.gender} onChange={e=>setFormData({...formData, gender:parseInt(e.target.value)})}>
+                                    <option value={1}>男</option><option value={0}>女</option>
+                                </select>
+                            </div>
+                            <div className="mt-2">
+                                <label className="flex items-center gap-2 text-sm text-gray-600">
+                                    <input type="checkbox" checked={formData.useTrueSolar} onChange={e=>setFormData({...formData, useTrueSolar:e.target.checked})} /> 啟用真太陽時 (需輸入經度)
                                 </label>
                             </div>
-                            
-                            <div className="mt-4 flex items-center gap-2">
-                                <input type="checkbox" checked={formData.useTrueSolar} onChange={(e) => setFormData({...formData, useTrueSolar: e.target.checked})} id="solarCheck"/>
-                                <label htmlFor="solarCheck" className="text-sm text-gray-600">啟用真太陽時校正</label>
-                            </div>
-
-                            {/* 錯誤訊息顯示區 */}
-                            {errorMsg && (
-                                <div className="mt-4 p-3 bg-red-100 text-red-700 rounded border border-red-200">
-                                    {errorMsg}
-                                </div>
-                            )}
-
-                            <button onClick={calculateBazi} disabled={!isLibraryReady} className={`mt-6 w-full py-3 rounded-lg font-bold text-white transition ${isLibraryReady ? 'bg-slate-800 hover:bg-slate-700' : 'bg-gray-400 cursor-not-allowed'}`}>
-                                {isLibraryReady ? '開始排盤分析' : '載入中...'}
-                            </button>
+                            {errorMsg && <div className="text-red-500 mt-2 text-sm">{errorMsg}</div>}
+                            <button onClick={calculateBazi} disabled={!isLibraryReady} className="w-full mt-4 bg-slate-800 text-white py-2 rounded hover:bg-slate-700">開始分析</button>
                         </section>
 
                         {result && (
                             <>
-                                <ChartDisplay result={result} gender={formData.gender} />
+                                <ChartDisplay result={result} />
                                 <AnalysisSection result={result} />
-                                <TenGodsSection result={result} />
+                                <TenGodsInteractionSection result={result} />
                                 <WealthSection result={result} />
-                                <DaYunSection result={result} />
+                                <DaYunDetailSection result={result} />
                                 <AdviceSection result={result} />
                                 <footer className="text-center text-xs text-gray-400 mt-12 print-break">
-                                    <p>本報告基於子平八字學理演算法生成，僅供娛樂與參考。</p>
+                                    <p>命理僅供參考，命運掌握在自己手中。</p>
                                 </footer>
                             </>
                         )}
@@ -430,68 +264,41 @@
 
         // --- 子組件 ---
 
-        function ChartDisplay({ result, gender }) {
-            const { eightChar, lunar, solar } = result;
-            
-            // 這裡只做顯示，為了安全也使用手動計算函式
+        function ChartDisplay({ result }) {
+            const { eightChar, solar } = result;
             const dayGanStr = safeGetName(eightChar.getDayGan());
             
             const getShiShen = (ganStr) => {
                 if (!ganStr || ganStr === dayGanStr) return '日主';
-                const s = calculateShiShenManual(dayGanStr, ganStr);
-                return s || '';
+                return calculateShiShenManual(dayGanStr, ganStr) || '';
             };
 
             const pillars = [
-                { title: '年柱', gan: eightChar.getYearGan(), zhi: eightChar.getYearZhi() },
-                { title: '月柱', gan: eightChar.getMonthGan(), zhi: eightChar.getMonthZhi() },
-                { title: '日柱', gan: eightChar.getDayGan(), zhi: eightChar.getDayZhi() },
-                { title: '時柱', gan: eightChar.getTimeGan(), zhi: eightChar.getTimeZhi() },
+                { t: '年', g: eightChar.getYearGan(), z: eightChar.getYearZhi() },
+                { t: '月', g: eightChar.getMonthGan(), z: eightChar.getMonthZhi() },
+                { t: '日', g: eightChar.getDayGan(), z: eightChar.getDayZhi() },
+                { t: '時', g: eightChar.getTimeGan(), z: eightChar.getTimeZhi() }
             ];
 
             return (
                 <section className="card bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-start mb-6">
-                        <div>
-                            <h2 className="text-lg font-bold text-slate-800">2. 八字命盤 (原始資料)</h2>
-                            <p className="text-sm text-gray-500">
-                                公曆：{solar.getYear()}/{solar.getMonth()}/{solar.getDay()} {solar.getHour()}:{solar.getMinute()}<br/>
-                                農曆：{lunar.getYearInGanZhi()}年 {lunar.getMonthInChinese()}月 {lunar.getDayInChinese()}
-                            </p>
-                        </div>
-                        <div className="text-right">
-                            <span className="inline-block px-3 py-1 bg-slate-100 rounded text-sm font-bold text-slate-600">
-                                {gender === 1 ? '乾造 (男)' : '坤造 (女)'}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-2 text-center border-t border-b border-slate-100 py-4">
-                        {pillars.map((p, idx) => {
-                            const ganName = safeGetName(p.gan);
-                            const zhiName = safeGetName(p.zhi);
-                            const wxGan = safeGetWuXing(p.gan);
-                            const wxZhi = safeGetWuXing(p.zhi);
-                            
+                    <div className="mb-4 text-slate-800 font-bold text-lg">2. 八字命盤</div>
+                    <div className="grid grid-cols-4 gap-2 text-center border-t border-b py-4">
+                        {pillars.map((p, i) => {
+                            const gName = safeGetName(p.g);
+                            const zName = safeGetName(p.z);
+                            const gWx = safeGetWuXing(p.g);
+                            const zWx = safeGetWuXing(p.z);
                             return (
-                                <div key={idx} className="space-y-2">
-                                    <div className="text-xs text-gray-400 font-bold">{p.title}</div>
-                                    <div className="text-xs text-amber-600 h-4">{getShiShen(ganName)}</div>
-                                    <div className={`text-2xl font-bold serif ${COLORS[wxGan]?.text || 'text-gray-800'}`}>
-                                        {ganName}
-                                    </div>
-                                    <div className={`text-2xl font-bold serif ${COLORS[wxZhi]?.text || 'text-gray-800'}`}>
-                                        {zhiName}
-                                    </div>
-                                    <div className="text-xs text-gray-400 flex flex-col gap-0.5 mt-2">
-                                        {safeGetHideGan(p.zhi).map((g, i) => {
-                                            const hName = safeGetName(g);
-                                            return (
-                                                <span key={i} className="scale-90">
-                                                    {hName}({safeGetWuXing(g)})
-                                                </span>
-                                            );
-                                        })}
+                                <div key={i}>
+                                    <div className="text-xs text-gray-400">{p.t}柱</div>
+                                    <div className="text-xs text-amber-600 h-4">{getShiShen(gName)}</div>
+                                    <div className={`text-2xl font-bold serif ${COLORS[gWx].text}`}>{gName}</div>
+                                    <div className={`text-2xl font-bold serif ${COLORS[zWx].text}`}>{zName}</div>
+                                    <div className="text-xs text-gray-400 flex flex-col mt-1">
+                                        {safeGetHideGan(p.z).map((h, idx) => (
+                                            <span key={idx} className="scale-90">{safeGetName(h)}</span>
+                                        ))}
                                     </div>
                                 </div>
                             );
@@ -503,281 +310,277 @@
 
         function AnalysisSection({ result }) {
             const { wuxingScores, isStrong, usefulGods, dmWuXing, avoidGods, dayMaster } = result;
-            const maxScore = Math.max(...Object.values(wuxingScores)) || 1;
+            const max = Math.max(...Object.values(wuxingScores)) || 1;
 
             return (
                 <section className="card bg-white p-6 rounded-lg shadow-sm border border-slate-200 grid md:grid-cols-2 gap-6">
                     <div>
-                        <h2 className="text-lg font-bold text-slate-800 mb-4">3. 五行能量平衡分析</h2>
-                        <div className="space-y-3">
-                            {Object.entries(wuxingScores).map(([wx, score]) => (
-                                <div key={wx} className="flex items-center text-sm">
-                                    <span className={`w-8 font-bold ${COLORS[wx]?.text || 'text-gray-600'}`}>{wx}</span>
-                                    <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden mx-2">
-                                        <div 
-                                            className={`h-full ${wx==='金'?'bg-yellow-500':wx==='木'?'bg-green-500':wx==='水'?'bg-blue-500':wx==='火'?'bg-red-500':'bg-amber-600'}`} 
-                                            style={{width: `${(score / maxScore) * 100}%`}}
-                                        ></div>
-                                    </div>
-                                    <span className="w-8 text-right text-gray-500">{score.toFixed(1)}</span>
+                        <h3 className="font-bold text-slate-800 mb-2">3. 五行能量</h3>
+                        {Object.entries(wuxingScores).map(([k, v]) => (
+                            <div key={k} className="flex items-center text-sm mb-1">
+                                <span className={`w-6 font-bold ${COLORS[k].text}`}>{k}</span>
+                                <div className="flex-1 h-2 bg-gray-100 rounded-full mx-2">
+                                    <div className={`h-full ${k==='金'?'bg-yellow-500':k==='木'?'bg-green-500':k==='水'?'bg-blue-500':k==='火'?'bg-red-500':'bg-amber-600'}`} style={{width: `${(v/max)*100}%`}}></div>
                                 </div>
-                            ))}
-                        </div>
+                                <span className="w-8 text-right">{v.toFixed(0)}</span>
+                            </div>
+                        ))}
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-slate-800 mb-4">4. 格局與喜用神判定</h2>
-                        <div className="space-y-4">
-                            <div className="bg-slate-50 p-4 rounded border border-slate-100">
-                                <p className="text-sm text-gray-600">日主天干</p>
-                                <p className="text-xl font-bold serif">{safeGetName(dayMaster)} ({dmWuXing})</p>
-                            </div>
-                            <div className="bg-slate-50 p-4 rounded border border-slate-100">
-                                <p className="text-sm text-gray-600">旺衰判定 (演算法)</p>
-                                <p className={`text-xl font-bold ${isStrong ? 'text-indigo-600' : 'text-pink-600'}`}>
-                                    {isStrong ? '身強 (Strong)' : '身弱 (Weak)'}
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="bg-green-50 p-3 rounded border border-green-100">
-                                    <p className="text-xs text-green-700 font-bold">喜用神</p>
-                                    <p className="font-bold text-lg">{usefulGods.join('、')}</p>
-                                </div>
-                                <div className="bg-red-50 p-3 rounded border border-red-100">
-                                    <p className="text-xs text-red-700 font-bold">忌神</p>
-                                    <p className="font-bold text-lg">{avoidGods.join('、')}</p>
-                                </div>
-                            </div>
+                        <h3 className="font-bold text-slate-800 mb-2">4. 格局判定</h3>
+                        <div className="bg-slate-50 p-3 rounded text-sm space-y-2">
+                            <p>日主：<span className="font-bold">{safeGetName(dayMaster)}({dmWuXing})</span></p>
+                            <p>強弱：<span className={isStrong ? 'text-red-600 font-bold' : 'text-blue-600 font-bold'}>{isStrong ? '身強 (Strong)' : '身弱 (Weak)'}</span></p>
+                            <p>喜用：<span className="text-green-700 font-bold">{usefulGods.join('、')}</span></p>
+                            <p>忌神：<span className="text-gray-500">{avoidGods.join('、')}</span></p>
                         </div>
                     </div>
                 </section>
             );
         }
 
-        function TenGodsSection({ result }) {
-            const { eightChar } = result;
-            // 獲取日主名稱 (字串)
-            const dayGanStr = safeGetName(eightChar.getDayGan());
-
-            const shiShenCounts = {};
+        // --- 核心邏輯：十神交互分析 (新功能) ---
+        function TenGodsInteractionSection({ result }) {
+            const { eightChar, isStrong } = result;
+            const dmStr = safeGetName(eightChar.getDayGan());
+            const counts = {};
             
-            // 收集所有天干與藏干 (全部處理為字串)
-            const elements = [
-                safeGetName(eightChar.getYearGan()), 
-                safeGetName(eightChar.getMonthGan()), 
-                safeGetName(eightChar.getTimeGan()),
-                ...safeGetHideGan(eightChar.getYearZhi()).map(g => safeGetName(g)),
-                ...safeGetHideGan(eightChar.getMonthZhi()).map(g => safeGetName(g)),
-                ...safeGetHideGan(eightChar.getDayZhi()).map(g => safeGetName(g)),
-                ...safeGetHideGan(eightChar.getTimeZhi()).map(g => safeGetName(g))
+            // 收集所有十神 (包含藏干)
+            const allGans = [
+                safeGetName(eightChar.getYearGan()), safeGetName(eightChar.getMonthGan()), safeGetName(eightChar.getTimeGan()),
+                ...safeGetHideGan(eightChar.getYearZhi()).map(g=>safeGetName(g)),
+                ...safeGetHideGan(eightChar.getMonthZhi()).map(g=>safeGetName(g)),
+                ...safeGetHideGan(eightChar.getDayZhi()).map(g=>safeGetName(g)),
+                ...safeGetHideGan(eightChar.getTimeZhi()).map(g=>safeGetName(g))
             ];
 
-            elements.forEach(elStr => {
-                try {
-                    if (elStr && elStr !== dayGanStr) {
-                        // 使用手動計算函式
-                        const shiShenName = calculateShiShenManual(dayGanStr, elStr);
-                        if (shiShenName) {
-                            shiShenCounts[shiShenName] = (shiShenCounts[shiShenName] || 0) + 1;
-                        }
-                    } else if (elStr === dayGanStr) {
-                        // 日主本身通常計為比肩，但一般統計時可能排除或計入
-                        shiShenCounts['比肩'] = (shiShenCounts['比肩'] || 0) + 1;
+            allGans.forEach(g => {
+                if (g && g !== dmStr) {
+                    const ss = calculateShiShenManual(dmStr, g);
+                    if (ss) {
+                        // 歸類：食神傷官合稱「食傷」，正偏財合稱「財星」，官殺合稱「官殺」，印梟合稱「印星」，比劫合稱「比劫」
+                        const groupMap = {
+                            '食神': '食傷', '傷官': '食傷',
+                            '正財': '財星', '偏財': '財星',
+                            '正官': '官殺', '七殺': '官殺',
+                            '正印': '印星', '偏印': '印星',
+                            '比肩': '比劫', '劫財': '比劫'
+                        };
+                        const group = groupMap[ss];
+                        counts[group] = (counts[group] || 0) + 1;
+                        counts[ss] = (counts[ss] || 0) + 1; // 詳細計數
                     }
-                } catch(e) {
-                    console.error("十神統計錯誤", e);
                 }
             });
 
-            const order = ['比肩', '劫財', '食神', '傷官', '正財', '偏財', '正官', '七殺', '正印', '偏印'];
+            // 找出最強勢的兩個十神族群
+            const sortedGroups = Object.entries(counts)
+                .filter(([k]) => ['食傷','財星','官殺','印星','比劫'].includes(k))
+                .sort((a, b) => b[1] - a[1]);
+            
+            const top1 = sortedGroups[0];
+            const top2 = sortedGroups[1];
+
+            let analysisText = "您的八字結構較為均衡，無極端偏向。";
+            let suggestion = "建議順應運勢，穩健發展。";
+
+            if (top1) {
+                const main = top1[0];
+                const score = top1[1];
+                
+                if (main === '官殺') {
+                    if (isStrong) {
+                        analysisText = `【身強官殺旺】：這是標準的「主管/老闆格」。身強能任官殺之剋，代表您抗壓性強，有決斷力與執行力，天生具備領導威望。`;
+                        suggestion = "適合在大型企業、公家機關發展，或自行創業擔任管理者。注意不要過於強勢霸道。";
+                    } else {
+                        analysisText = `【身弱官殺旺】：這稱為「官殺攻身」。您責任感過重，常感到壓力巨大，易犯小人或身體微恙，個性較為壓抑保守。`;
+                        suggestion = "適合從事文職、幕僚或技術工作。必須先「強身」（多學習、依靠長輩），不宜強出頭承擔過大責任。";
+                    }
+                } else if (main === '財星') {
+                    if (isStrong) {
+                        analysisText = `【身強財星旺】：這是「富翁之格」。您有賺錢的能力與體力，對商機嗅覺敏銳，能將才華轉化為實質財富。`;
+                        suggestion = "適合經商、業務、金融投資。大膽把握機會，但需注意財多傷印（忽略健康或名聲）。";
+                    } else {
+                        analysisText = `【身弱財星旺】：這叫「富屋貧人」。您身邊賺錢機會多，或整天經手大筆金錢（如會計），但自己卻難以留住，容易因財招禍或體力透支。`;
+                        suggestion = "建議尋求合作（比劫分財），不要獨資。適合領固定高薪或穩定儲蓄，切勿從事高風險投機。";
+                    }
+                } else if (main === '食傷') {
+                    if (isStrong) {
+                        analysisText = `【身強食傷旺】：這是「才子/發明家格」。您聰明絕頂，反應快，口才好，喜歡自由發揮，不愛受拘束。`;
+                        suggestion = "適合創意、行銷、演藝、講師、設計等需要展現個人魅力的行業。";
+                    } else {
+                        analysisText = `【身弱食傷旺】：這叫「泄身太過」。您思慮過多，容易神經質或想太多做太少，往往聰明反被聰明誤，體質較虛。`;
+                        suggestion = "建議專精一項技能，不要太發散。多運動增強體力，並學習專注。";
+                    }
+                } else if (main === '印星') {
+                    analysisText = `【印星旺】：${isStrong ? '身強印旺，稍微懶散依賴，貴人運好但較缺乏衝勁。' : '身弱印旺，得長輩庇蔭，喜好學習與精神層面，個性溫和。'}`;
+                    suggestion = "適合從事學術、研究、教育、宗教或幕後策劃工作。需培養執行力。";
+                } else if (main === '比劫') {
+                    analysisText = `【比劫旺】：${isStrong ? '身強比劫旺，個性固執好勝，講義氣但也容易被朋友拖累破財。' : '身弱比劫旺，得朋友兄弟相助，適合合夥打拼。'}`;
+                    suggestion = "適合團隊合作、連鎖加盟或體力相關工作。理財要保守，防範借貸不還。";
+                }
+            }
 
             return (
                 <section className="card bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4">5. 十神格局詳細分析</h2>
-                    <p className="text-sm text-gray-500 mb-4">十神代表您的行為模式與社會關係。數量多者代表該特質顯著。</p>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        {order.map(god => (
-                            <div key={god} className="bg-slate-50 p-3 rounded text-center border border-slate-100">
-                                <div className="text-xs text-gray-500 mb-1">{god}</div>
-                                <div className="text-xl font-bold text-slate-700">{shiShenCounts[god] || 0}</div>
+                    <h2 className="text-lg font-bold text-slate-800 mb-4">5. 命格與十神交互分析</h2>
+                    <div className="flex flex-col md:flex-row gap-6">
+                        <div className="flex-1">
+                            <div className="grid grid-cols-5 gap-2 text-center mb-4">
+                                {['食傷','財星','官殺','印星','比劫'].map(g => (
+                                    <div key={g} className="bg-slate-50 p-2 rounded border">
+                                        <div className="text-xs text-gray-500">{g}</div>
+                                        <div className="font-bold text-slate-800">{counts[g]||0}</div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                            <div className="p-4 bg-amber-50 rounded border border-amber-100">
+                                <div className="font-bold text-amber-800 mb-2">格局判斷</div>
+                                <p className="text-sm text-gray-700 leading-relaxed font-bold">{analysisText}</p>
+                            </div>
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="font-bold text-slate-700 mb-2">交互影響詳解：</h4>
+                            <p className="text-sm text-gray-600 leading-relaxed mb-4">{suggestion}</p>
+                            <p className="text-xs text-gray-400">* 交互性分析結合了「日主強弱」與「十神多寡」，是論命的核心關鍵。單看十神數量而不論身強身弱是不準確的。</p>
+                        </div>
                     </div>
                 </section>
             );
         }
 
         function WealthSection({ result }) {
+            // ... (保持原有的財運分析代碼) ...
             const { wuxingScores, dmWuXing, isStrong } = result;
             const wealthElement = WEALTH_MAP[dmWuXing];
             const wealthScore = wuxingScores[wealthElement] || 0;
             const maxScore = Math.max(...Object.values(wuxingScores)) || 1;
-            
-            let title = "";
-            let description = "";
-            
             const isWealthStrong = wealthScore > (maxScore * 0.2);
-
-            if (isStrong && isWealthStrong) {
-                title = "身旺財旺 (Rich Potential)";
-                description = "您的命格中，自身能量強且財星能量也強。這是典型的富貴之格，代表您有能力賺錢，也有能力守財。適合經商、創業或從事高回報的投資活動。";
-            } else if (isStrong && !isWealthStrong) {
-                title = "身旺財弱 (Need Skill)";
-                description = "您的自身能量強，但財星能量較弱。這意味著您體力或能力很好，但機會較少或不聚財。建議依靠一技之長（食傷生財）來生財，避免高風險投機。";
-            } else if (!isStrong && isWealthStrong) {
-                title = "財多身弱 (Wealth Burden)";
-                description = "您的財星能量很強，但自身能量較弱。這在命理上稱為「富屋貧人」，容易因求財而感到壓力巨大或健康受損。建議尋求合作夥伴（比劫助身）或長輩貴人（印星）協助，不宜獨資。";
-            } else {
-                title = "身弱財弱 (Stability First)";
-                description = "您的自身能量與財星能量皆不強。這代表平穩之命，不宜過度追求橫財。適合上班族、公務員或穩定的儲蓄理財方式，知足常樂。";
-            }
+            
+            let title, description;
+            if (isStrong && isWealthStrong) { title = "身旺財旺 (大富)"; description = "身強能任財，且財星有力。適合創業、投資，財源廣進。"; }
+            else if (isStrong && !isWealthStrong) { title = "身旺財弱 (技術求財)"; description = "身強但財星弱。宜靠一技之長或專業技術賺錢，不宜投機。"; }
+            else if (!isStrong && isWealthStrong) { title = "財多身弱 (富屋貧人)"; description = "財星太旺反成壓力。宜合夥、保守，防因財傷身。"; }
+            else { title = "身弱財弱 (知足常樂)"; description = "求財辛苦，宜上班領薪，積少成多，平淡是福。"; }
 
             return (
-                <section className="card bg-white p-6 rounded-lg shadow-sm border border-slate-200 border-l-4 border-l-yellow-500">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4">6. 財運專屬分析 (Wealth Luck)</h2>
-                    <div className="flex flex-col md:flex-row gap-6">
-                        <div className="flex-1">
-                            <div className="bg-yellow-50 p-4 rounded mb-3">
-                                <div className="text-sm text-yellow-800 font-bold mb-1">您的財星五行</div>
-                                <div className="text-2xl font-bold text-yellow-600 serif">{wealthElement} (能量: {wealthScore.toFixed(1)})</div>
-                            </div>
-                            <div className="bg-slate-50 p-4 rounded">
-                                <div className="text-sm text-slate-500 mb-1">財運格局</div>
-                                <div className="text-lg font-bold text-slate-800">{title}</div>
-                            </div>
+                <section className="card bg-white p-6 rounded-lg shadow-sm border border-slate-200 mt-6">
+                    <h2 className="text-lg font-bold text-slate-800 mb-4">6. 財運專屬分析</h2>
+                    <div className="flex justify-between items-center bg-yellow-50 p-4 rounded">
+                        <div>
+                            <div className="text-sm text-yellow-800">您的財星</div>
+                            <div className="text-2xl font-bold text-yellow-600">{wealthElement}</div>
                         </div>
-                        <div className="flex-[2]">
-                            <h3 className="font-bold text-slate-700 mb-2">詳細解析與建議：</h3>
-                            <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                                {description}
-                            </p>
-                            <div className="text-xs text-gray-400 bg-gray-50 p-2 rounded">
-                                * 註：財星包含正財（穩定收入）與偏財（投資/意外之財）。此分析基於原局五行結構。
-                            </div>
+                        <div className="text-right">
+                            <div className="font-bold text-slate-700">{title}</div>
+                            <div className="text-sm text-gray-500">{description}</div>
                         </div>
                     </div>
                 </section>
             );
         }
 
-        function DaYunSection({ result }) {
-            const { yun } = result;
-            const daYunArr = yun.getDaYun();
-            const currentYear = new Date().getFullYear();
-            
-            const getLiuNian = (year) => {
-                try {
-                    return window.Lunar ? window.Lunar.fromYmd(year, 6, 15).getYearInGanZhi() : '';
-                } catch(e) { return ''; }
+        // --- 核心邏輯：大運流年評分 (新功能) ---
+        function DaYunDetailSection({ result }) {
+            const { yun, usefulGods, avoidGods, eightChar } = result;
+            const daYunArr = yun.getDaYun().slice(0, 8); // 取前8步大運
+            const dmStr = safeGetName(eightChar.getDayGan());
+
+            // 評分邏輯
+            const getScore = (ganStr, zhiStr) => {
+                const ganWx = safeGetWuXing(ganStr);
+                const zhiWx = safeGetWuXing(zhiStr);
+                let score = 60; // 基礎分
+                
+                // 天干權重 40%，地支權重 60%
+                if (usefulGods.includes(ganWx)) score += 15;
+                else if (avoidGods.includes(ganWx)) score -= 15;
+                
+                if (usefulGods.includes(zhiWx)) score += 25;
+                else if (avoidGods.includes(zhiWx)) score -= 25;
+                
+                return Math.max(0, Math.min(100, score));
+            };
+
+            // 獲取建議文字
+            const getAdvice = (ganStr, zhiStr, score) => {
+                const tenGod = calculateShiShenManual(dmStr, ganStr);
+                let type = "";
+                if (score >= 80) type = "吉運";
+                else if (score >= 60) type = "平運";
+                else type = "凶運";
+
+                const descMap = {
+                    '比肩': '朋友互助，合作機會，但也易分財。',
+                    '劫財': '社交活躍，需防破財或被朋友拖累。',
+                    '食神': '心情愉快，口福好，適合學習新知。',
+                    '傷官': '才華展現，但易犯口舌，工作變動大。',
+                    '正財': '收入穩定，財運佳，適合保守理財。',
+                    '偏財': '意外之財，投資機會，但起伏較大。',
+                    '正官': '事業升遷，名聲佳，女命有利姻緣。',
+                    '七殺': '壓力較大，責任重，需防血光或小人。',
+                    '正印': '貴人相助，有利考運與置產。',
+                    '偏印': '思想獨特，較孤僻，有利冷門偏業。'
+                };
+
+                return { type, desc: descMap[tenGod] || "運勢流轉，需謹慎行事。" };
             };
 
             return (
-                <section className="card bg-white p-6 rounded-lg shadow-sm border border-slate-200 print-break">
-                    <h2 className="text-lg font-bold text-slate-800 mb-2">7. 大運與流年速查</h2>
-                    <div className="flex overflow-x-auto pb-4 gap-2">
-                        {daYunArr.slice(0, 8).map((dy, idx) => {
-                            const startYear = dy.getStartYear();
-                            const endYear = dy.getEndYear();
-                            const ganZhi = dy.getGanZhi();
-                            const isCurrent = currentYear >= startYear && currentYear <= endYear;
+                <section className="card bg-white p-6 rounded-lg shadow-sm border border-slate-200 mt-6">
+                    <h2 className="text-lg font-bold text-slate-800 mb-4">7. 大運流年量化詳解</h2>
+                    <div className="space-y-4">
+                        {daYunArr.map((dy, idx) => {
+                            const gan = dy.getGanZhi().charAt(0);
+                            const zhi = dy.getGanZhi().charAt(1);
+                            const score = getScore(gan, zhi);
+                            const info = getAdvice(gan, zhi, score);
+                            
+                            // 顏色樣式
+                            let scoreColor = "bg-gray-200 text-gray-600";
+                            if (score >= 80) scoreColor = "bg-red-100 text-red-700 border-red-200";
+                            else if (score >= 60) scoreColor = "bg-yellow-100 text-yellow-700 border-yellow-200";
+                            else scoreColor = "bg-slate-200 text-slate-600 border-slate-300";
 
                             return (
-                                <div key={idx} className={`flex-shrink-0 w-24 border rounded p-3 text-center ${isCurrent ? 'ring-2 ring-amber-500 bg-amber-50' : 'bg-white'}`}>
-                                    <div className="text-xs text-gray-500">{dy.getStartAge()}歲</div>
-                                    <div className="text-xs text-gray-400 mb-1">{startYear}起</div>
-                                    <div className="text-xl font-bold serif text-slate-800 my-1">{ganZhi}</div>
-                                    <div className="text-xs mt-1">
-                                        {isCurrent && <span className="text-red-500 font-bold">目前</span>}
+                                <div key={idx} className={`p-3 rounded border flex items-center justify-between ${scoreColor}`}>
+                                    <div className="text-center w-16 border-r border-gray-300 pr-3">
+                                        <div className="text-xs opacity-70">{dy.getStartAge()}歲起</div>
+                                        <div className="text-xl font-bold serif">{dy.getGanZhi()}</div>
+                                    </div>
+                                    <div className="flex-1 px-4">
+                                        <div className="flex justify-between mb-1">
+                                            <span className="font-bold">{info.type} ({calculateShiShenManual(dmStr, gan)}運)</span>
+                                            <span className="font-bold text-lg">{score}分</span>
+                                        </div>
+                                        <div className="text-sm opacity-90">{info.desc}</div>
+                                        {/* 如果是凶運，加警語 */}
+                                        {score < 60 && <div className="text-xs mt-1 font-bold">⚠️ 注意：此運勢較低迷，五行不調，建議保守守成，多行善積德。</div>}
                                     </div>
                                 </div>
                             );
                         })}
-                    </div>
-                    <div className="mt-6">
-                        <h3 className="font-bold text-slate-700 text-sm mb-3">近五年流年</h3>
-                        <div className="grid grid-cols-5 gap-2 text-center text-sm">
-                            {[currentYear, currentYear+1, currentYear+2, currentYear+3, currentYear+4].map(year => (
-                                <div key={year} className="bg-slate-50 p-2 rounded">
-                                    <div className="text-gray-500 text-xs">{year}</div>
-                                    <div className="font-bold text-slate-700">{getLiuNian(year)}</div>
-                                </div>
-                            ))}
-                        </div>
                     </div>
                 </section>
             );
         }
 
         function AdviceSection({ result }) {
-            const { usefulGods, eightChar } = result;
-            const dayGanStr = safeGetName(eightChar.getDayGan());
-
-            // 性格分析邏輯 (Safety First - 使用手動計算)
-            const getPersonality = () => {
-                try {
-                    const shiShenCounts = {};
-                    const elements = [
-                        safeGetName(eightChar.getYearGan()), 
-                        safeGetName(eightChar.getMonthGan()), 
-                        safeGetName(eightChar.getTimeGan()),
-                        ...safeGetHideGan(eightChar.getYearZhi()).map(g => safeGetName(g)),
-                        ...safeGetHideGan(eightChar.getMonthZhi()).map(g => safeGetName(g)),
-                        ...safeGetHideGan(eightChar.getDayZhi()).map(g => safeGetName(g)),
-                        ...safeGetHideGan(eightChar.getTimeZhi()).map(g => safeGetName(g))
-                    ];
-
-                    elements.forEach(elStr => {
-                        if (elStr && elStr !== dayGanStr) {
-                            const shiShen = calculateShiShenManual(dayGanStr, elStr);
-                            if (shiShen) {
-                                const normalizedName = shiShen === '梟神' ? '偏印' : shiShen;
-                                shiShenCounts[normalizedName] = (shiShenCounts[normalizedName] || 0) + 1;
-                            }
-                        }
-                    });
-
-                    const keys = Object.keys(shiShenCounts);
-                    if (keys.length === 0) return { trait: '綜合', desc: '性格均衡，無特別明顯偏向。' };
-
-                    const mainTrait = keys.reduce((a, b) => shiShenCounts[a] > shiShenCounts[b] ? a : b);
-                    const desc = PERSONALITY_TRAITS[mainTrait] || '性格多樣化，具有多種特質。';
-                    
-                    return { trait: mainTrait, desc };
-                } catch (e) {
-                    console.error('Personality Analysis Error', e);
-                    return { trait: '分析中', desc: '無法判定主要性格。' };
-                }
-            };
-
-            const personality = getPersonality();
-
+            const { usefulGods } = result;
             return (
-                <section className="card bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                    <h2 className="text-lg font-bold text-slate-800 mb-6">8. 趨吉避凶與開運行動</h2>
-                    
-                    <div className="grid md:grid-cols-2 gap-8">
-                        <div>
-                            <h3 className="font-bold text-slate-700 border-l-4 border-amber-500 pl-2 mb-3">性格特質</h3>
-                            <div className="bg-slate-50 p-4 rounded">
-                                <p className="font-bold text-slate-800 mb-1">主導性格：{personality.trait}</p>
-                                <p className="text-sm text-gray-600 leading-relaxed">{personality.desc}</p>
+                <section className="card bg-white p-6 rounded-lg shadow-sm border border-slate-200 mt-6">
+                    <h2 className="text-lg font-bold text-slate-800 mb-4">8. 開運指南</h2>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        {usefulGods.map(wx => (
+                            <div key={wx} className={`p-3 rounded border-l-4 ${wx==='木'?'border-green-500 bg-green-50':wx==='火'?'border-red-500 bg-red-50':wx==='土'?'border-amber-500 bg-amber-50':wx==='金'?'border-yellow-500 bg-yellow-50':'border-blue-500 bg-blue-50'}`}>
+                                <div className="font-bold mb-1">補運五行：{wx}</div>
+                                <div className="text-xs text-gray-600">
+                                    <p>顏色：{COLORS[wx].suggest}</p>
+                                    <p>方位：{DIRECTION_SUGGESTIONS[wx]}</p>
+                                    <p>行業：{CAREER_SUGGESTIONS[wx]}</p>
+                                </div>
                             </div>
-                        </div>
-
-                        <div>
-                            <h3 className="font-bold text-slate-700 border-l-4 border-amber-500 pl-2 mb-3">開運建議</h3>
-                            <ul className="space-y-3 text-sm">
-                                {usefulGods.map(wx => (
-                                    <li key={wx} className="flex gap-3">
-                                        <span className={`font-bold w-6 ${COLORS[wx]?.text || ''}`}>{wx}</span>
-                                        <div className="flex-1">
-                                            <p><span className="text-gray-500">顏色：</span>{COLORS[wx]?.suggest}</p>
-                                            <p><span className="text-gray-500">方位：</span>{DIRECTION_SUGGESTIONS[wx]}</p>
-                                            <p><span className="text-gray-500">行業：</span>{CAREER_SUGGESTIONS[wx]}</p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
+                        ))}
                     </div>
                 </section>
             );
