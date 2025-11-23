@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>專業八字命盤系統 (V2修正版)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.6.12/lunar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        .bg-wood { background-color: #dcfce7; color: #166534; border: 1px solid #166534; }
+        .bg-fire { background-color: #fee2e2; color: #991b1b; border: 1px solid #991b1b; }
+        .bg-earth { background-color: #fef9c3; color: #854d0e; border: 1px solid #854d0e; }
+        .bg-metal { background-color: #f3f4f6; color: #374151; border: 1px solid #374151; }
+        .bg-water { background-color: #dbeafe; color: #1e40af; border: 1px solid #1e40af; }
+        .font-bazi { font-family: "KaiTi", "STKaiti", serif; font-weight: bold; }
+        /* 動畫 */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.5s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+<div id="app" class="max-w-5xl mx-auto p-4">
+    
+    <header class="mb-8 text-center">
+        <h1 class="text-3xl font-bold text-indigo-700 mb-2">🔮 專業八字命盤系統 V2</h1>
+        <p class="text-gray-500 text-sm">含真太陽時校正、十神分析、五行強弱圖表</p>
+    </header>
+
+    <section class="bg-white p-6 rounded-xl shadow-md mb-8">
+        <h2 class="text-xl font-semibold mb-4 border-l-4 border-indigo-500 pl-3">輸入資料</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700">姓名</label>
+                <input v-model="form.name" type="text" class="mt-1 block w-full rounded-md border-gray-300 border p-2" placeholder="請輸入姓名">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">性別</label>
+                <select v-model="form.gender" class="mt-1 block w-full rounded-md border-gray-300 border p-2">
+                    <option :value="1">男 (乾造)</option>
+                    <option :value="0">女 (坤造)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">出生日期 (國曆)</label>
+                <input v-model="form.date" type="date" class="mt-1 block w-full rounded-md border-gray-300 border p-2">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">出生時間</label>
+                <div class="flex gap-2">
+                    <select v-model="form.hour" class="w-1/2 rounded-md border p-2">
+                        <option v-for="h in 24" :key="h-1" :value="h-1">{{ (h-1).toString().padStart(2,'0') }} 時</option>
+                    </select>
+                    <select v-model="form.minute" class="w-1/2 rounded-md border p-2">
+                        <option v-for="m in 60" :key="m-1" :value="m-1">{{ (m-1).toString().padStart(2,'0') }} 分</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    出生城市 (真太陽時校正)
+                    <span class="text-xs text-indigo-600 ml-2 font-bold" v-if="trueSolarTimeStr">🌞 真太陽時: {{ trueSolarTimeStr }}</span>
+                </label>
+                <div class="flex gap-2 mt-1">
+                    <select v-model="selectedCity" @change="updateLocation" class="block w-1/2 rounded-md border-gray-300 border p-2">
+                        <option value="custom">自訂經度</option>
+                        <option v-for="city in cities" :key="city.name" :value="city">{{ city.name }}</option>
+                    </select>
+                    <input v-model.number="form.longitude" type="number" step="0.01" class="block w-1/2 rounded-md border-gray-300 border p-2" placeholder="經度">
+                </div>
+            </div>
+
+        </div>
+
+        <div class="mt-6 text-center">
+            <button @click="calculate" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow w-full md:w-auto active:scale-95 transition">
+                開始排盤
+            </button>
+        </div>
+    </section>
+
+    <div v-if="result" class="animate-fade-in">
+        
+        <div class="bg-white p-4 rounded-xl shadow mb-6 flex flex-wrap justify-between items-center text-sm md:text-base">
+            <div>
+                <span class="font-bold text-gray-900 text-lg">{{ form.name || '命主' }}</span> 
+                <span class="text-gray-300 mx-2">|</span>
+                <span>{{ form.gender === 1 ? '乾造' : '坤造' }}</span>
+                <span class="text-gray-300 mx-2">|</span>
+                <span>{{ result.zodiac }}年</span>
+            </div>
+            <div class="text-gray-600 mt-2 md:mt-0 text-right">
+                <div class="font-bold text-indigo-800">{{ result.lunarDate }}</div>
+                <div class="text-xs">節氣：{{ result.solarTerm }}</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow">
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">🗓️ 四柱八字</h3>
+                <div class="grid grid-cols-4 gap-2 text-center">
+                    <div class="text-gray-400 text-xs">年柱</div>
+                    <div class="text-gray-400 text-xs">月柱</div>
+                    <div class="text-indigo-600 text-xs font-bold">日柱 (主)</div>
+                    <div class="text-gray-400 text-xs">時柱</div>
+
+                    <div v-for="(p, i) in result.pillars" :key="'god'+i" class="text-xs text-gray-500 h-5">{{ p.ganGod }}</div>
+
+                    <div v-for="(p, i) in result.pillars" :key="'gan'+i" class="text-2xl md:text-3xl font-bazi py-2 rounded shadow-sm" :class="getColorClass(p.ganWX)">
+                        {{ p.gan }}
+                    </div>
+
+                    <div v-for="(p, i) in result.pillars" :key="'zhi'+i" class="text-2xl md:text-3xl font-bazi py-2 rounded shadow-sm" :class="getColorClass(p.zhiWX)">
+                        {{ p.zhi }}
+                    </div>
+
+                    <div v-for="(p, i) in result.pillars" :key="'hide'+i" class="text-xs text-gray-400 mt-2 leading-tight">
+                        <div v-for="h in p.hidden" :key="h">{{ h }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow flex flex-col items-center">
+                <h3 class="text-lg font-semibold mb-2 text-gray-800">⚖️ 五行能量</h3>
+                <div class="relative h-64 w-full flex justify-center items-center">
+                    <canvas id="fiveElementChart"></canvas>
+                </div>
+                <div class="mt-4 text-center text-sm">
+                    <span class="bg-gray-100 px-2 py-1 rounded text-gray-600">最強：{{ result.scores.max.name }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 bg-white p-6 rounded-xl shadow overflow-x-auto">
+            <h3 class="text-lg font-semibold mb-4 text-gray-800">🌊 大運 (每十年)</h3>
+            <div class="flex min-w-max gap-3 pb-2">
+                <div v-for="(yun, i) in result.daYun" :key="i" class="border border-gray-200 rounded-lg p-3 w-20 text-center hover:bg-indigo-50 transition cursor-default">
+                    <div class="text-xs text-gray-400 mb-1">{{ yun.startAge }}歲</div>
+                    <div class="flex flex-col gap-1 font-bazi text-lg">
+                        <span :class="getColorText(yun.ganWX)">{{ yun.gan }}</span>
+                        <span :class="getColorText(yun.zhiWX)">{{ yun.zhi }}</span>
+                    </div>
+                    <div class="text-[10px] text-gray-400 mt-1">{{ yun.startYear }}</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, nextTick } = Vue;
+
+    createApp({
+        setup() {
+            const form = ref({
+                name: '',
+                gender: 1, 
+                date: new Date().toISOString().split('T')[0],
+                hour: 12,
+                minute: 0,
+                longitude: 121.53
+            });
+
+            const cities = [
+                { name: '台北', lng: 121.53 }, { name: '高雄', lng: 120.28 },
+                { name: '台中', lng: 120.68 }, { name: '北京', lng: 116.40 },
+                { name: '上海', lng: 121.47 }, { name: '香港', lng: 114.17 },
+                { name: '東京', lng: 139.69 }, { name: '紐約', lng: -74.00 },
+                { name: '倫敦', lng: -0.12 }, { name: '雪梨', lng: 151.20 }
+            ];
+            
+            const selectedCity = ref(cities[0]);
+            const result = ref(null);
+            const trueSolarTimeStr = ref('');
+            let chartInstance = null;
+
+            const updateLocation = () => {
+                if (selectedCity.value !== 'custom') {
+                    form.value.longitude = selectedCity.value.lng;
+                }
+            };
+
+            const getColorClass = (wx) => ({
+                '木': 'bg-wood', '火': 'bg-fire', '土': 'bg-earth', '金': 'bg-metal', '水': 'bg-water'
+            }[wx] || 'bg-gray-100');
+
+            const getColorText = (wx) => ({
+                '木': 'text-green-700', '火': 'text-red-700', '土': 'text-yellow-700', '金': 'text-gray-700', '水': 'text-blue-700'
+            }[wx] || 'text-gray-700');
+
+            const calculate = async () => {
+                try {
+                    // 1. 檢查程式庫是否載入
+                    if (typeof window.Solar === 'undefined' || typeof window.Lunar === 'undefined') {
+                        throw new Error("系統核心正在載入中，請稍等 2 秒後再試...");
+                    }
+                    
+                    const Solar = window.Solar;
+                    const Lunar = window.Lunar;
+
+                    // 2. 計算真太陽時
+                    const [y, m, d] = form.value.date.split('-').map(Number);
+                    // 經度時差公式：(當地經度 - 120) * 4 分鐘
+                    const offsetMinutes = (form.value.longitude - 120) * 4;
+                    
+                    // 建立基礎時間物件
+                    let jsDate = new Date(y, m - 1, d, form.value.hour, form.value.minute);
+                    // 加上時差
+                    jsDate.setMinutes(jsDate.getMinutes() + offsetMinutes);
+
+                    // 更新顯示文字
+                    trueSolarTimeStr.value = `${jsDate.getHours()}:${jsDate.getMinutes().toString().padStart(2,'0')}`;
+
+                    // 3. 使用校正後的時間排盤
+                    const solar = Solar.fromYmdHms(
+                        jsDate.getFullYear(), 
+                        jsDate.getMonth() + 1, 
+                        jsDate.getDate(), 
+                        jsDate.getHours(), 
+                        jsDate.getMinutes(), 
+                        0
+                    );
+                    
+                    const lunar = solar.getLunar();
+                    const eightChar = lunar.getEightChar();
+                    // 設定流派 (2=晚子時算當天, 早子時算明天，目前主流)
+                    eightChar.setSect(2); 
+
+                    // 4. 組合資料
+                    const pillars = [];
+                    const parts = [
+                        { g: eightChar.getYearGan(), z: eightChar.getYearZhi(), god: lunar.getYearShiShenGan() },
+                        { g: eightChar.getMonthGan(), z: eightChar.getMonthZhi(), god: lunar.getMonthShiShenGan() },
+                        { g: eightChar.getDayGan(), z: eightChar.getDayZhi(), god: '日主' },
+                        { g: eightChar.getTimeGan(), z: eightChar.getTimeZhi(), god: lunar.getTimeShiShenGan() }
+                    ];
+
+                    let scores = { '木': 0, '火': 0, '土': 0, '金': 0, '水': 0 };
+
+                    parts.forEach(p => {
+                        const ganWx = p.g.getWuXing();
+                        const zhiWx = p.z.getWuXing();
+                        
+                        scores[ganWx] += 10;
+                        scores[zhiWx] += 10;
+
+                        const hidden = p.z.getHiddenGan().map(h => h.getName() + h.getWuXing());
+
+                        pillars.push({
+                            gan: p.g.getName(), ganWX: ganWx, ganGod: p.god,
+                            zhi: p.z.getName(), zhiWX: zhiWx, hidden
+                        });
+                    });
+
+                    // 計算五行最大值
+                    let maxVal = -1;
+                    let maxName = '';
+                    for (const [k, v] of Object.entries(scores)) {
+                        if (v > maxVal) { maxVal = v; maxName = k; }
+                    }
+
+                    // 大運
+                    const yun = eightChar.getYun(form.value.gender);
+                    const daYun = yun.getDaYun().slice(0, 8).map(dy => ({
+                        startAge: dy.getStartAge(),
+                        startYear: dy.getStartYear(),
+                        gan: dy.getGanZhi().charAt(0),
+                        zhi: dy.getGanZhi().charAt(1),
+                        ganWX: Lunar.getGan(dy.getGanZhi().charAt(0)).getWuXing(),
+                        zhiWX: Lunar.getZhi(dy.getGanZhi().charAt(1)).getWuXing()
+                    }));
+
+                    result.value = {
+                        lunarDate: lunar.toString(),
+                        zodiac: lunar.getYearShengXiao(),
+                        solarTerm: lunar.getJieQi() || '無',
+                        pillars,
+                        scores: { data: scores, max: { name: maxName } },
+                        daYun
+                    };
+
+                    // 5. 等待 DOM 更新後繪製圖表
+                    await nextTick();
+                    renderChart(scores);
+
+                } catch (e) {
+                    alert("排盤發生錯誤: " + e.message);
+                    console.error(e);
+                }
+            };
+
+            const renderChart = (scores) => {
+                const ctx = document.getElementById('fiveElementChart');
+                if (!ctx) return;
+
+                if (chartInstance) chartInstance.destroy();
+
+                chartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['木', '火', '土', '金', '水'],
+                        datasets: [{
+                            label: '能量分佈',
+                            data: [scores['木'], scores['火'], scores['土'], scores['金'], scores['水']],
+                            backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                            borderColor: 'rgba(79, 70, 229, 1)',
+                            pointBackgroundColor: '#4f46e5',
+                            pointBorderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            r: {
+                                beginAtZero: true,
+                                ticks: { display: false }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            };
+
+            return {
+                form, cities, selectedCity, result, trueSolarTimeStr,
+                updateLocation, calculate, getColorClass, getColorText
+            };
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
