@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>專業八字命盤系統 (V2修正版)</title>
+    <title>專業八字命盤系統 (V2最終修正版)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -237,36 +237,33 @@
                     // 設定流派
                     eightChar.setSect(2); 
 
-                    // 4. 組合資料 (核心修正部分)
+                    // 4. 組合資料
                     
-                    // ★ 取得日主天干作為十神計算的基準
+                    // ★ 取得日主天干（Gan 物件），作為十神計算的基準
                     const dayGan = eightChar.getDayGan();
 
                     const pillars = [];
                     const parts = [
-                        // 年柱十神計算: 使用年干與日主天干比較
                         { 
                             g: eightChar.getYearGan(), 
                             z: eightChar.getYearZhi(), 
-                            god: eightChar.getYearGan().getShiShen(dayGan).getName()
+                            // 修正後的十神計算：呼叫天干物件的 getShiShen，並傳入日干物件
+                            god: eightChar.getYearGan().getShiShen(dayGan).getName() 
                         },
-                        // 月柱十神計算: 使用月干與日主天干比較
                         { 
                             g: eightChar.getMonthGan(), 
                             z: eightChar.getMonthZhi(), 
-                            god: eightChar.getMonthGan().getShiShen(dayGan).getName()
+                            god: eightChar.getMonthGan().getShiShen(dayGan).getName() 
                         },
-                        // 日柱
                         { 
                             g: eightChar.getDayGan(), 
                             z: eightChar.getDayZhi(), 
                             god: '日主' 
                         },
-                        // 時柱十神計算: 使用時干與日主天干比較
                         { 
                             g: eightChar.getTimeGan(), 
                             z: eightChar.getTimeZhi(), 
-                            god: eightChar.getTimeGan().getShiShen(dayGan).getName()
+                            god: eightChar.getTimeGan().getShiShen(dayGan).getName() 
                         }
                     ];
 
@@ -281,9 +278,8 @@
                         scores[ganWx] += 10;
                         scores[zhiWx] += 10;
 
-                        // 藏干資訊
+                        // 藏干資訊：只顯示藏干的名稱
                         const hidden = p.z.getHiddenGan().map(h => h.getName());
-                        // 可以在這裡加入藏干的十神和五行，目前只顯示天干名稱
 
                         pillars.push({
                             gan: p.g.getName(), ganWX: ganWx, ganGod: p.god,
