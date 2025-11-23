@@ -11,6 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
+        /* 五行顏色定義 */
         .bg-wood { background-color: #dcfce7; color: #166534; border: 1px solid #166534; }
         .bg-fire { background-color: #fee2e2; color: #991b1b; border: 1px solid #991b1b; }
         .bg-earth { background-color: #fef9c3; color: #854d0e; border: 1px solid #854d0e; }
@@ -169,9 +170,10 @@
                 date: new Date().toISOString().split('T')[0],
                 hour: 12,
                 minute: 0,
-                longitude: 121.53
+                longitude: 121.53 // 台北經度
             });
 
+            // 預設城市列表，用於真太陽時校正
             const cities = [
                 { name: '台北', lng: 121.53 }, { name: '高雄', lng: 120.28 },
                 { name: '台中', lng: 120.68 }, { name: '北京', lng: 116.40 },
@@ -209,18 +211,16 @@
                     const Solar = window.Solar;
                     const Lunar = window.Lunar;
 
-                    // 2. 計算真太陽時
+                    // 2. 計算真太陽時校正
                     const [y, m, d] = form.value.date.split('-').map(Number);
-                    // 經度時差公式：(當地經度 - 120) * 4 分鐘
+                    // 經度時差：(當地經度 - 120) * 4 分鐘
                     const offsetMinutes = (form.value.longitude - 120) * 4;
                     
-                    // 建立基礎時間物件
                     let jsDate = new Date(y, m - 1, d, form.value.hour, form.value.minute);
-                    // 加上時差
                     jsDate.setMinutes(jsDate.getMinutes() + offsetMinutes);
 
                     // 更新顯示文字
-                    trueSolarTimeStr.value = `${jsDate.getHours()}:${jsDate.getMinutes().toString().padStart(2,'0')}`;
+                    trueSolarTimeStr.value = `${jsDate.getHours().toString().padStart(2,'0')}:${jsDate.getMinutes().toString().padStart(2,'0')}`;
 
                     // 3. 使用校正後的時間排盤
                     const solar = Solar.fromYmdHms(
@@ -234,28 +234,56 @@
                     
                     const lunar = solar.getLunar();
                     const eightChar = lunar.getEightChar();
-                    // 設定流派 (2=晚子時算當天, 早子時算明天，目前主流)
+                    // 設定流派
                     eightChar.setSect(2); 
 
-                    // 4. 組合資料
+                    // 4. 組合資料 (核心修正部分)
+                    
+                    // ★ 取得日主天干作為十神計算的基準
+                    const dayGan = eightChar.getDayGan();
+
                     const pillars = [];
                     const parts = [
-                        { g: eightChar.getYearGan(), z: eightChar.getYearZhi(), god: lunar.getYearShiShenGan() },
-                        { g: eightChar.getMonthGan(), z: eightChar.getMonthZhi(), god: lunar.getMonthShiShenGan() },
-                        { g: eightChar.getDayGan(), z: eightChar.getDayZhi(), god: '日主' },
-                        { g: eightChar.getTimeGan(), z: eightChar.getTimeZhi(), god: lunar.getTimeShiShenGan() }
+                        // 年柱十神計算: 使用年干與日主天干比較
+                        { 
+                            g: eightChar.getYearGan(), 
+                            z: eightChar.getYearZhi(), 
+                            god: eightChar.getYearGan().getShiShen(dayGan).getName()
+                        },
+                        // 月柱十神計算: 使用月干與日主天干比較
+                        { 
+                            g: eightChar.getMonthGan(), 
+                            z: eightChar.getMonthZhi(), 
+                            god: eightChar.getMonthGan().getShiShen(dayGan).getName()
+                        },
+                        // 日柱
+                        { 
+                            g: eightChar.getDayGan(), 
+                            z: eightChar.getDayZhi(), 
+                            god: '日主' 
+                        },
+                        // 時柱十神計算: 使用時干與日主天干比較
+                        { 
+                            g: eightChar.getTimeGan(), 
+                            z: eightChar.getTimeZhi(), 
+                            god: eightChar.getTimeGan().getShiShen(dayGan).getName()
+                        }
                     ];
 
+                    // 五行計分 (基礎分)
                     let scores = { '木': 0, '火': 0, '土': 0, '金': 0, '水': 0 };
 
                     parts.forEach(p => {
                         const ganWx = p.g.getWuXing();
                         const zhiWx = p.z.getWuXing();
                         
+                        // 簡單計分
                         scores[ganWx] += 10;
                         scores[zhiWx] += 10;
 
-                        const hidden = p.z.getHiddenGan().map(h => h.getName() + h.getWuXing());
+                        // 藏干資訊
+                        const hidden = p.z.getHiddenGan().map(h => h.getName());
+                        // 可以在這裡加入藏干的十神和五行，目前只顯示天干名稱
 
                         pillars.push({
                             gan: p.g.getName(), ganWX: ganWx, ganGod: p.god,
@@ -342,5 +370,4 @@
 </script>
 
 </body>
-
 </html>
